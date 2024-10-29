@@ -3,7 +3,7 @@
 {
     "name": "Helpdesk Stage Server Action",
     "summary": "Execute server actions when reaching a Helpdesk ticket stage",
-    "version": "14.0.1.0.0",
+    "version": "17.0.1.0.0",
     "category": "HelpDesk Service",
     "author": "Camptocamp, Odoo Community Association (OCA)",
     "website": "https://github.com/OCA/helpdesk",
