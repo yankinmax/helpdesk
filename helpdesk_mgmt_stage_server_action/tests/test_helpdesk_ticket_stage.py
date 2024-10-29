@@ -1,33 +1,32 @@
 # Copyright 2023 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
-from odoo.tests.common import SavepointCase
+from odoo.tests.common import RecordCapturer, TransactionCase
+
+from odoo.addons.base.tests.common import DISABLED_MAIL_CONTEXT
 
 
-class HelpdeskTicketStageServerAction(SavepointCase):
+class HelpdeskTicketStageServerAction(TransactionCase):
     @classmethod
     def setUpClass(cls):
-        super(HelpdeskTicketStageServerAction, cls).setUpClass()
-        cls.ServerAction = cls.env["ir.actions.server"]
+        super().setUpClass()
+        cls.env = cls.env(context=dict(cls.env.context, **DISABLED_MAIL_CONTEXT))
         cls.HelpdeskTicket = cls.env["helpdesk.ticket"]
         cls.HelpdeskTicketStage = cls.env["helpdesk.ticket.stage"]
-        cls.field = cls.env["ir.model.fields"]._get(cls.HelpdeskTicket._name, "user_id")
+        cls.HelpdeskTicketTag = cls.env["helpdesk.ticket.tag"]
+        cls.ServerAction = cls.env["ir.actions.server"]
         cls.server_action_helpdesk_ticket = cls.ServerAction.create(
             {
                 "name": "Helpdesk Ticket Server Action",
-                "model_id": cls.env.ref("helpdesk_mgmt.model_helpdesk_ticket").id,
+                "model_id": cls.env["ir.model"]._get_id("helpdesk.ticket"),
+                "crud_model_id": cls.env["ir.model"]._get_id("helpdesk.ticket"),
+                "value": str(cls.env.user.id),
+                "update_path": "user_id",
+                "update_field_id": cls.env["ir.model.fields"]._get_ids(
+                    "helpdesk.ticket"
+                )["user_id"],
+                "evaluation_type": "value",
                 "state": "object_write",
-                "fields_lines": [
-                    (
-                        0,
-                        0,
-                        {
-                            "col1": cls.field.id,
-                            "evaluation_type": "value",
-                            "value": cls.env.user.id,
-                        },
-                    )
-                ],
             }
         )
         cls.helpdesk_ticket_stage_1 = cls.HelpdeskTicketStage.create(
@@ -94,3 +93,31 @@ class HelpdeskTicketStageServerAction(SavepointCase):
         self.assertFalse(self.helpdesk_ticket_4.user_id)
         self.helpdesk_ticket_4.write({"stage_id": self.helpdesk_ticket_stage_2.id})
         self.assertEqual(self.helpdesk_ticket_4.user_id, self.env.user)
+
+    def test_helpdesk_ticket_run_action(self):
+        create_tag_action = self.ServerAction.create(
+            {
+                "model_id": self.env["ir.model"]._get_id("helpdesk.ticket.tag"),
+                "crud_model_id": self.env["ir.model"]._get_id("helpdesk.ticket.tag"),
+                "name": "Create new helpdesk tag",
+                "value": "New helpdesk tag",
+                "state": "object_create",
+            }
+        )
+        stage_1 = self.HelpdeskTicketStage.create(
+            {"name": "Stage 1", "sequence": 1, "action_id": create_tag_action.id}
+        )
+        ticket = self.HelpdeskTicket.create(
+            {
+                "name": "Create a tag ticket",
+                "description": "Ticket Description",
+            }
+        )
+        self.assertFalse(
+            self.HelpdeskTicketTag.search([("name", "=", "New helpdesk tag")]).exists()
+        )
+        with RecordCapturer(self.HelpdeskTicketTag, []) as capture:
+            ticket.write({"stage_id": stage_1.id})
+        tag = capture.records
+        self.assertEqual(1, len(tag))
+        self.assertEqual("New helpdesk tag", tag.name)

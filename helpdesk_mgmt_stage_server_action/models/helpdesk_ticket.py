@@ -12,17 +12,19 @@ class HelpdeskTicket(models.Model):
         records = super().create(vals_list)
         for record in records:
             action = record.stage_id.action_id
-            if action:
-                context = {
-                    "active_model": self._name,
-                    "active_ids": [record.id],
-                }
-                action.with_context(**context).run()
+            if not action:
+                continue
+            context = {
+                "active_model": self._name,
+                "active_id": record.id,
+                "active_ids": records.ids,
+            }
+            action.with_context(**context).run()
         return records
 
     def write(self, vals):
         records = "stage_id" in vals and self.filtered(
-            lambda l: l.stage_id.id != vals.get("stage_id")
+            lambda ticket: ticket.stage_id.id != vals.get("stage_id")
         )
         if records:
             res = super().write(vals)
@@ -32,6 +34,7 @@ class HelpdeskTicket(models.Model):
             if action:
                 context = {
                     "active_model": self._name,
+                    "active_id": records.id,
                     "active_ids": records.ids,
                 }
                 action.with_context(**context).run()
