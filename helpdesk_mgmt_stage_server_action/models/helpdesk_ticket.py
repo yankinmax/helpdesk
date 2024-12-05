@@ -17,6 +17,7 @@ class HelpdeskTicket(models.Model):
             context = {
                 "active_model": self._name,
                 "active_id": record.id,
+                "active_ids": records.ids,
             }
             action.with_context(**context).run()
         return records
@@ -33,6 +34,7 @@ class HelpdeskTicket(models.Model):
             if action:
                 context = {
                     "active_model": self._name,
+                    "active_id": records.id,
                     "active_ids": records.ids,
                 }
                 action.with_context(**context).run()
